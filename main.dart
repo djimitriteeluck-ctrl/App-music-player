@@ -2,6 +2,473 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'dart:ui';
 
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Liquid Glass Music',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0B0F19),
+        primaryColor: const Color(0xFF1DB954),
+        fontFamily: 'sans-serif',
+      ),
+      home: const CastMusicScreen(),
+    );
+  }
+}
+
+class CastMusicScreen extends StatefulWidget {
+  const CastMusicScreen({Key? key}) : super(key: key);
+
+  @override
+  State<CastMusicScreen> createState() => _CastMusicScreenState();
+}
+
+class _CastMusicScreenState extends State<CastMusicScreen> {
+  late AudioPlayer _audioPlayer;
+  bool isPlaying = false;
+  bool isLiked = false;
+  bool isCastingToTV = false;
+  Color accentColor = const Color(0xFF1DB954);
+
+  // Valeurs de l'égaliseur audio
+  double bassGain = 3.0;
+  double midGain = 0.0;
+  double trebleGain = 2.5;
+  double preAmp = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    setState(() {
+      isPlaying = !isPlaying;
+    });
+  }
+
+  void _toggleCast() {
+    setState(() {
+      isCastingToTV = !isCastingToTV;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(isCastingToTV ? "Connecté à la Google TV (Cast actif)" : "Mode Téléphone réactivé"),
+        backgroundColor: accentColor,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Ouvre le panneau de l'égaliseur professionnel
+  void _openEqualizerPanel() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF131826).withOpacity(0.85),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                    border: Border.all(color: Colors.white.withOpacity(0.15)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.equalizer, color: Colors.greenAccent),
+                              SizedBox(width: 10),
+                              Text(
+                                "Égaliseur Pro Audio",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white70),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      
+                      // Préréglages rapides
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildPresetButton("Shatta / Bass", () {
+                            setModalState(() {
+                              bassGain = 8.0;
+                              midGain = -1.0;
+                              trebleGain = 5.0;
+                            });
+                            setState(() {});
+                          }),
+                          _buildPresetButton("Dancehall", () {
+                            setModalState(() {
+                              bassGain = 6.0;
+                              midGain = 2.0;
+                              trebleGain = 4.0;
+                            });
+                            setState(() {});
+                          }),
+                          _buildPresetButton("Flat (Neutre)", () {
+                            setModalState(() {
+                              bassGain = 0.0;
+                              midGain = 0.0;
+                              trebleGain = 0.0;
+                            });
+                            setState(() {});
+                          }),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Contrôles des bandes de fréquences
+                      _buildSliderRow("Basses (60Hz)", bassGain, -10.0, 12.0, (val) {
+                        setModalState(() => bassGain = val);
+                        setState(() {});
+                      }),
+                      _buildSliderRow("Médiums (1kHz)", midGain, -10.0, 12.0, (val) {
+                        setModalState(() => midGain = val);
+                        setState(() {});
+                      }),
+                      _buildSliderRow("Aigus (14kHz)", trebleGain, -10.0, 12.0, (val) {
+                        setModalState(() => trebleGain = val);
+                        setState(() {});
+                      }),
+                      _buildSliderRow("Pré-ampli", preAmp, 0.0, 6.0, (val) {
+                        setModalState(() => preAmp = val);
+                        setState(() {});
+                      }),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPresetButton(String title, VoidCallback onTap) {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white.withOpacity(0.1),
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 0,
+      ),
+      onPressed: onTap,
+      child: Text(title, style: const TextStyle(fontSize: 12)),
+    );
+  }
+
+  Widget _buildSliderRow(String label, double value, double min, double max, ValueChanged<double> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            Text("${value.toStringAsFixed(1)} dB", style: const TextStyle(color: Colors.greenAccent, fontSize: 13, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          activeColor: accentColor,
+          inactiveColor: Colors.white24,
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          // Arrière-plan Liquid Glass avec dégradés lumineux
+          Positioned(
+            top: -100,
+            left: -50,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accentColor.withOpacity(0.3),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -50,
+            right: -50,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.blueAccent.withOpacity(0.2),
+              ),
+            ),
+          ),
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+            child: Container(color: Colors.transparent),
+          ),
+
+          // Contenu principal
+          SafeArea(
+            child: Column(
+              children: [
+                // Barre de navigation supérieure avec Égaliseur et Chromecast TV
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Liquid Glass Music",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          // Bouton Égaliseur direct
+                          IconButton(
+                            icon: const Icon(Icons.equalizer, color: Colors.greenAccent),
+                            onPressed: _openEqualizerPanel,
+                            tooltip: "Ouvrir l'égaliseur",
+                          ),
+                          // Bouton de Cast Google TV interactif
+                          IconButton(
+                            icon: Icon(
+                              isCastingToTV ? Icons.cast_connected : Icons.cast,
+                              color: isCastingToTV ? Colors.greenAccent : Colors.white70,
+                            ),
+                            onPressed: _toggleCast,
+                            tooltip: "Diffuser sur Google TV",
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (isCastingToTV)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.withOpacity(0.5)),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.tv, color: Colors.greenAccent, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          "Diffusion en cours sur Google TV",
+                          style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const Spacer(),
+
+                // Pochette d'album style Verre Liquide (Glassmorphism)
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                      child: Container(
+                        width: 280,
+                        height: 280,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: Colors.white.withOpacity(0.2)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.album,
+                              size: 100,
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                            const SizedBox(height: 20),
+                            const Text(
+                              "Shatta & Dancehall Vibe",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              "DJIMII PROD",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white.withOpacity(0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const Spacer(),
+
+                // Contrôles de lecture et barre de progression
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 30),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              isLiked ? Icons.favorite : Icons.favorite_border,
+                              color: isLiked ? Colors.redAccent : Colors.white70,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                isLiked = !isLiked;
+                              });
+                            },
+                          ),
+                          const Text("1:24", style: TextStyle(color: Colors.white54)),
+                          const Text("3:45", style: TextStyle(color: Colors.white54)),
+                        ],
+                      ),
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          activeTrackColor: accentColor,
+                          inactiveTrackColor: Colors.white24,
+                          thumbColor: Colors.white,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        ),
+                        value: 0.35,
+                        onChanged: (val) {},
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.shuffle, color: Colors.white60),
+                            onPressed: () {},
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.skip_previous, size: 36, color: Colors.white),
+                            onPressed: () {},
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: accentColor,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: accentColor.withOpacity(0.5),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              icon: Icon(
+                                isPlaying ? Icons.pause : Icons.play_arrow,
+                                size: 36,
+                                color: Colors.white,
+                              ),
+                              onPressed: _togglePlay,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.skip_next, size: 36, color: Colors.white),
+                            onPressed: () {},
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.repeat, color: Colors.white60),
+                            onPressed: () {},
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
+import 'dart:ui';
+
 // Note: Vous ajouterez le package cast pour gérer la connexion à la Google TV
 // import 'package:cast/cast.h'; 
 
